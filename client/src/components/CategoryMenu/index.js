@@ -1,61 +1,73 @@
-import React, { useEffect } from 'react';
-import { useQuery } from '@apollo/client';
-import { useStoreContext } from '../../utils/GlobalState';
-import {
-  UPDATE_CATEGORIES,
-  UPDATE_CURRENT_CATEGORY,
-} from '../../utils/actions';
-import { QUERY_CATEGORIES } from '../../utils/queries';
-import { idbPromise } from '../../utils/helpers';
+import React from 'react';
+//import { useStoreContext } from "../../utils/GlobalState";
 
-function CategoryMenu() {
-  const [state, dispatch] = useStoreContext();
+import { REMOVE_FROM_CART, UPDATE_CART_QUANTITY } from "../../utils/actions";
+import { idbPromise } from "../../utils/helpers";
+import { useDispatch } from 'react-redux';
 
-  const { categories } = state;
+const CartItem = ({ item }) => {
 
-  const { loading, data: categoryData } = useQuery(QUERY_CATEGORIES);
+  //const [, dispatch] = useStoreContext();
+  const dispatch = useDispatch();
 
-  useEffect(() => {
-    if (categoryData) {
-      dispatch({
-        type: UPDATE_CATEGORIES,
-        categories: categoryData.categories,
-      });
-      categoryData.categories.forEach((category) => {
-        idbPromise('categories', 'put', category);
-      });
-    } else if (!loading) {
-      idbPromise('categories', 'get').then((categories) => {
-        dispatch({
-          type: UPDATE_CATEGORIES,
-          categories: categories,
-        });
-      });
-    }
-  }, [categoryData, loading, dispatch]);
-
-  const handleClick = (id) => {
+  const removeFromCart = item => {
     dispatch({
-      type: UPDATE_CURRENT_CATEGORY,
-      currentCategory: id,
+      type: REMOVE_FROM_CART,
+      _id: item._id
     });
+    idbPromise('cart', 'delete', { ...item });
+
   };
 
+  const onChange = (e) => {
+    const value = e.target.value;
+    if (value === '0') {
+      dispatch({
+        type: REMOVE_FROM_CART,
+        _id: item._id
+      });
+      idbPromise('cart', 'delete', { ...item });
+
+    } else {
+      dispatch({
+        type: UPDATE_CART_QUANTITY,
+        _id: item._id,
+        purchaseQuantity: parseInt(value)
+      });
+      idbPromise('cart', 'put', { ...item, purchaseQuantity: parseInt(value) });
+
+    }
+  }
+
   return (
-    <div>
-      <h2>Choose a Category:</h2>
-      {categories.map((item) => (
-        <button
-          key={item._id}
-          onClick={() => {
-            handleClick(item._id);
-          }}
-        >
-          {item.name}
-        </button>
-      ))}
+    <div className="flex-row">
+      <div>
+        <img
+          src={`/images/${item.image}`}
+          alt=""
+        />
+      </div>
+      <div>
+        <div>{item.name}, ${item.price}</div>
+        <div>
+          <span>Qty:</span>
+          <input
+            type="number"
+            placeholder="1"
+            value={item.purchaseQuantity}
+            onChange={onChange}
+          />
+          <span
+            role="img"
+            aria-label="trash"
+            onClick={() => removeFromCart(item)}
+          >
+            🗑️
+          </span>
+        </div>
+      </div>
     </div>
   );
 }
 
-export default CategoryMenu;
+export default CartItem;
